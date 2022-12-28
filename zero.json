@@ -1,0 +1,36 @@
+[
+    {
+        "market_type": "MATCH_ODDS",
+        "runners": [
+            {
+                "runnerType": "ANTE",
+                "oddValue": 1.98,
+                "totalStake": 0,
+                "totalbets": 20
+            },
+            {
+                "runnerType": "PLAY",
+                "oddValue": 1.98,
+                "totalStake": 0,
+                "totalbets": 4
+            },
+            {
+                "runnerType": "FOLD",
+                "oddValue": 1.98,
+                "totalStake": 0,
+                "totalbets": 4
+            }
+        ]
+    },
+    {
+        "market_type": "BONUS",
+        "runners": [
+            {
+                "runnerType": "BONUS",
+                "oddValue": 0,
+                "totalStake": 0,
+                "totalbets": 20
+            }
+        ]
+    }
+]

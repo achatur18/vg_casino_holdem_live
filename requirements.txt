@@ -1,0 +1,5 @@
+requests
+kafka-python
+pymongo
+pymongo[srv]
+loguru
