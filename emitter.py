@@ -82,3 +82,11 @@ class Emitter:
         ])
         data = list(result)
         return data
+
+    def get_values_from_data(self, market, runner, data):
+        filtered_data = [x for x in data if x['runnerType']
+                         == runner if x['market_type'] == market]
+        if len(filtered_data):
+            return filtered_data[0]
+        else:
+            return {'total_bet_amount': 0, 'oddValue': None, 'runnerType': None, 'market_type': None}

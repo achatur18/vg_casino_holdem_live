@@ -4,7 +4,18 @@ import json
 import os
 from loguru import logger
 import requests
+import random
+ODD_VALUES = list(range(3, 11, 2)) + ["a", "k", "j"]
+EVEN_VALUES = list(range(2, 10, 2)) + ["x", "q"]
+BLACK_SUITS = ["s", "c"]
+RED_SUITS = ["h", "d"]
+ALL_SUITS = BLACK_SUITS + RED_SUITS
 
+ALL_CARDS = [
+    str(value) + suit
+    for suit in BLACK_SUITS + RED_SUITS
+    for value in ODD_VALUES + EVEN_VALUES
+]
 
 class CasinoHoldemLiveEmitter(Emitter):
     '''
@@ -18,6 +29,9 @@ class CasinoHoldemLiveEmitter(Emitter):
         self.game_id = game_id
         self.round_id = None
         self.ROOT_PATH = (os.sep).join(__file__.split(os.sep)[:-1])
+        self.p2_cards = []
+        self.p1_cards = []
+        self.common_cards = []
 
     def get_round_key(self):
         if self.round_id:
@@ -95,21 +109,31 @@ class CasinoHoldemLiveEmitter(Emitter):
             for i in range(len(bets_json)):
                 if(bets_json[i]['market_type'] == market):
                     for j in range(len(bets_json[i]['runners'])):
-                        if(bets_json[i]['runners'][j]['runnerType'] == runner):
+                        if(bets_json[i]['runners'][j]['runnerType'] == "BONUS"):
+                            filtered_data = self.get_values_from_data(
+                                'BONUS', 'ONE_PAIR', data)
+                            bets_json[i]['runners'][j]['totalStake'] = filtered_data['total_bet_amount']
+
+                        elif(bets_json[i]['runners'][j]['runnerType'] == runner):
                             bets_json[i]['runners'][j]['totalStake'] = betsamount
                             bets_json[i]['runners'][j]['oddValue'] = oddValue
 
         logger.info(bets_json)
         json_data = {'bet_data': bets_json,
-                     'table_id': self.table_id, 'round_id': self.round_id}
+                     'table_id': self.table_id, 'round_id': self.round_id, "shown_cards": {"p1_cards": self.p1_cards, "common_cards": self.common_cards}}
         try:
             resp = requests.post(
-                f'{self.RTP_BASE_URL}/rtp/casino_holdem', data=json.dumps(json_data)).json()
-            self.p1_cards = resp['p1_cards']
+                f'{self.RTP_BASE_URL}/rtp/casino_holdem_live', data=json.dumps(json_data)).json()
             self.p2_cards = resp['p2_cards']
-            self.common_cards = resp['common_cards']
+            self.common_cards += resp['common_cards']
+
         except Exception as e:
             logger.info(e)
+    
+    def get_initial_cards(self):
+        random.shuffle(ALL_CARDS)
+        self.p1_cards = ALL_CARDS[:2]
+        self.common_cards = ALL_CARDS[-3:]
 
     def emit_new_card(self, a_ix, b_ix, c_ix):
         p1_cards = self.p1_cards
@@ -167,26 +191,26 @@ if __name__ == "__main__":
             emitter.emit_start()
             time.sleep(15)
             emitter.emit_stop()
-            emitter.get_cards()
-            time.sleep(3)
+            emitter.get_initial_cards()
             emitter.emit_new_card(1, 0, 0)
             time.sleep(2)
             emitter.emit_new_card(2, 0, 0)
             time.sleep(2)
-            emitter.emit_new_card(2, 1, 0)
+            emitter.emit_new_card(2, 0, 1)
             time.sleep(2)
-            emitter.emit_new_card(2, 2, 0)
+            emitter.emit_new_card(2, 0, 2)
             time.sleep(5)
-            emitter.emit_new_card(2, 2, 1)
+            emitter.emit_new_card(2, 0, 3)
+            time.sleep(10)
+            emitter.get_cards()
+            emitter.emit_new_card(2, 0, 4)
             time.sleep(2)
-            emitter.emit_new_card(2, 2, 2)
+            emitter.emit_new_card(2, 0, 5)
             time.sleep(2)
-            emitter.emit_new_card(2, 2, 3)
-            time.sleep(2)
-            emitter.emit_new_card(2, 2, 4)
+            emitter.emit_new_card(2, 1, 5)
             time.sleep(2)
             emitter.emit_new_card(2, 2, 5)
-            time.sleep(4)
+            time.sleep(6)
             emitter.emit_round_end()
             time.sleep(6)
     else:
