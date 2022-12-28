@@ -8,13 +8,13 @@ import requests
 
 class CasinoHoldemLiveEmitter(Emitter):
     '''
-    CasinoHoldemLive Events emitter
+    Teen Patti Events emitter
     '''
 
     def __init__(self, table_id, game_id) -> None:
         super().__init__()
         self.table_id = table_id
-        self.game_type = 'CasinoHoldemLive'
+        self.game_type = 'poker'
         self.game_id = game_id
         self.round_id = None
         self.ROOT_PATH = (os.sep).join(__file__.split(os.sep)[:-1])
@@ -52,7 +52,7 @@ class CasinoHoldemLiveEmitter(Emitter):
 
     def emit_start(self):
         '''
-        Emit the start event 
+        Emit the start event
         '''
         self.round_id = str(self.table_id)+"."+str(int(time.time()))
         current_ts = int(time.time() * 1000)
@@ -69,7 +69,7 @@ class CasinoHoldemLiveEmitter(Emitter):
 
     def emit_stop(self):
         '''
-        Emit the stop event 
+        Emit the stop event
         '''
         current_ts = int(time.time() * 1000)
         event_type = 'NO_MORE_BETS'
@@ -104,32 +104,24 @@ class CasinoHoldemLiveEmitter(Emitter):
                      'table_id': self.table_id, 'round_id': self.round_id}
         try:
             resp = requests.post(
-                f'{self.RTP_BASE_URL}/rtp/casino_holdem_live', data=json.dumps(json_data)).json()
-            self.left_card = resp['left_card']
-            self.right_card = resp['right_card']
-            self.center_card = resp['center_card']
+                f'{self.RTP_BASE_URL}/rtp/casino_holdem', data=json.dumps(json_data)).json()
+            self.p1_cards = resp['p1_cards']
+            self.p2_cards = resp['p2_cards']
+            self.common_cards = resp['common_cards']
         except Exception as e:
             logger.info(e)
 
-    def emit_left_card(self):
-        left_card = self.expand_card(self.left_card)
-        logger.info(f'CasinoHoldemLive : {left_card}')
-        current_ts = int(time.time() * 1000)
-        event_type = 'NEW_CARD'
-        value = {"result": {
-            "eventType": event_type,
-            "gameType": self.game_type,
-            "tableId": self.table_id,
-            "roundId": self.round_id,
-            "ts": current_ts,
-            "betTime": current_ts
-        }, "sequenceId": current_ts, "playerACards": [left_card]}
-        self.emit(value)
+    def emit_new_card(self, a_ix, b_ix, c_ix):
+        p1_cards = self.p1_cards
+        p2_cards = self.p2_cards
+        common_cards = self.common_cards
+        p1_cards = [self.expand_card(card) for card in p1_cards[:a_ix]]
+        p2_cards = [self.expand_card(card) for card in p2_cards[:b_ix]]
+        common_cards = [self.expand_card(card) for card in common_cards[:c_ix]]
 
-    def emit_right_card(self):
-        right_card = self.expand_card(self.right_card)
-        left_card = self.expand_card(self.left_card)
-        logger.info(f'CasinoHoldemLive : {right_card}')
+        logger.info(f'player_A: {p1_cards}')
+        logger.info(f'player_B: {p2_cards}')
+        logger.info(f'Common: {common_cards}')
         current_ts = int(time.time() * 1000)
         event_type = 'NEW_CARD'
         value = {"result": {
@@ -139,30 +131,14 @@ class CasinoHoldemLiveEmitter(Emitter):
             "roundId": self.round_id,
             "ts": current_ts,
             "betTime": current_ts
-        }, "sequenceId": current_ts, "playerACards": [left_card], "playerCCards": [right_card], "playerBCards": None}
-        self.emit(value)
-
-    def emit_center_card(self):
-        right_card = self.expand_card(self.right_card)
-        left_card = self.expand_card(self.left_card)
-        center_card = self.expand_card(self.center_card)
-        logger.info(f'CasinoHoldemLive : {center_card}')
-        current_ts = int(time.time() * 1000)
-        event_type = 'NEW_CARD'
-        value = {"result": {
-            "eventType": event_type,
-            "gameType": self.game_type,
-            "tableId": self.table_id,
-            "roundId": self.round_id,
-            "ts": current_ts,
-            "betTime": current_ts
-        }, "sequenceId": current_ts, "playerACards": [left_card], "playerCCards": [right_card], "playerBCards": [center_card]}
+        }, "sequenceId": current_ts, 'playerACards': p1_cards, 'playerBCards': p2_cards, 'playerCCards': common_cards}
         self.emit(value)
 
     def emit_round_end(self):
-        right_card = self.expand_card(self.right_card)
-        left_card = self.expand_card(self.left_card)
-        center_card = self.expand_card(self.center_card)
+        p1_cards = [self.expand_card(card) for card in self.p1_cards]
+        p2_cards = [self.expand_card(card) for card in self.p2_cards]
+        common_cards = [self.expand_card(card)
+                        for card in self.common_cards]
         current_ts = int(time.time() * 1000)
         event_type = 'ROUND_END'
         value = {"result": {
@@ -172,49 +148,46 @@ class CasinoHoldemLiveEmitter(Emitter):
             "roundId": self.round_id,
             "ts": current_ts,
             "betTime": current_ts
-        }, "sequenceId": current_ts, "playerACards": [left_card], "playerCCards": [right_card], "playerBCards": [center_card]}
+        }, "sequenceId": current_ts, 'playerACards': p1_cards, 'playerBCards': p2_cards, 'playerCCards': common_cards}
         self.emit(value)
 
 
 if __name__ == "__main__":
     import time
-    import sys
-    import os
 
     game_id = os.environ['GAME_ID']
     table_id = os.environ['TABLE_ID']
-    
-    try:
-        host = os.environ['HOSTNAME']
-    except:
-        host = 'localhost'
-    
-    logger.configure(extra={"table_id": table_id, "host": host})
-    logger.add(sys.stderr,
-                   format="{extra[host]} - {extra[table_id]} - [{time}] - {message}")
 
-
-    game_id = os.environ['GAME_ID']
-    table_id = os.environ['TABLE_ID']
-    
-
-    logger.info(f'CasinoHoldemLive GAME ID : {game_id}')
-    logger.info(f'CasinoHoldemLive TABLE ID : {table_id}')
+    logger.info(f'CasinoHoldemLiveEmitter GAME ID : {game_id}')
+    logger.info(f'CasinoHoldemLiveEmitter TABLE ID : {table_id}')
 
     if game_id and table_id:
         emitter = CasinoHoldemLiveEmitter(table_id, game_id)
         while True:
             emitter.emit_start()
-            time.sleep(20)
+            time.sleep(15)
             emitter.emit_stop()
             emitter.get_cards()
-            emitter.emit_left_card()
+            time.sleep(3)
+            emitter.emit_new_card(1, 0, 0)
+            time.sleep(2)
+            emitter.emit_new_card(2, 0, 0)
+            time.sleep(2)
+            emitter.emit_new_card(2, 1, 0)
+            time.sleep(2)
+            emitter.emit_new_card(2, 2, 0)
             time.sleep(5)
-            emitter.emit_right_card()
-            time.sleep(5)
-            emitter.emit_center_card()
-            time.sleep(5)
+            emitter.emit_new_card(2, 2, 1)
+            time.sleep(2)
+            emitter.emit_new_card(2, 2, 2)
+            time.sleep(2)
+            emitter.emit_new_card(2, 2, 3)
+            time.sleep(2)
+            emitter.emit_new_card(2, 2, 4)
+            time.sleep(2)
+            emitter.emit_new_card(2, 2, 5)
+            time.sleep(4)
             emitter.emit_round_end()
-            time.sleep(5)
+            time.sleep(6)
     else:
         logger.info(f'Invalid or empty table and/or game id')
